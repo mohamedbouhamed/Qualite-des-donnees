@@ -25,7 +25,6 @@ class TProv:
         n = df.shape[0]
         matrix = np.zeros((m,n))
         for i,idx in enumerate(out_df.index):
-            print(idx)
             matrix[i,idx] = 1
         matrix = csr_matrix(matrix)
         return out_df,matrix
@@ -104,12 +103,12 @@ class TProv:
     #     tensor1 = csr_matrix((np.ones(n), (range(n), idx1)), shape=(n, len(df1)))
     #     tensor2 = csr_matrix((np.ones(n), (range(n), idx2)), shape=(n, len(df2)))
     #     return df_out.drop(columns=["_id1", "_id2"]), (tensor1, tensor2)
-# df = pd.DataFrame({"A":[1,2,4],"B":[9,5,np.nan]})
-# condition = "A>1"
-# filter_with_prov = TProv(pd.DataFrame.query)
-# df_filt,matrix=filter_with_prov(df,condition)
+df = pd.DataFrame({"A":[1,2,4],"B":[9,5,np.nan]})
+condition = "A>1"
+filter_with_prov = TProv(pd.DataFrame.query)
+df_filt,tensor=filter_with_prov(df,condition)
 
-# print(df_filt,matrix,df)
+#print(df_filt,tensor,df)
 
 # print((i,idx) for i,idx in enumerate(df))
 
@@ -130,6 +129,21 @@ df2 = pd.DataFrame({"Name":["Alice","Bob"]})
 join_with_prov = TProv(pd.DataFrame.join)
 df_concat, tensors = join_with_prov(df1, df2)
 tensor1, tensor2 = tensors
-print(tensor1)
-print(tensor2)
-print(df_concat)
+#print(tensor1)
+#print(tensor2)
+#print(tensor1[i].nonzero())
+#print(df_concat)
+
+def ouptut_from_input(input_df, tensor):
+    input_rows_indices = tensor.nonzero()[1]
+    return input_df.iloc[input_rows_indices,:]
+print(ouptut_from_input(df,tensor))
+print(df_filt)
+def input_from_output(out_df, tensor):
+    output_rows_indices = tensor.nonzero()[0]
+    print(output_rows_indices)
+    return out_df.iloc[output_rows_indices,:]
+#print(df)
+input = input_from_output(df_filt, tensor)
+#print(input)
+#print(df)

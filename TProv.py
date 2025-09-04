@@ -1,9 +1,6 @@
 import pandas as pd
 import numpy as np
-import time
-import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
-import sys
 
 class TProv:
     def __init__(self,func):
@@ -99,52 +96,32 @@ class TProv:
         return df_join, (matrix1,matrix2)
     
     def decorate_vertical_reduction(self, df, columns=None, axis=1, **kwargs):
-        """Vertical Reduction - suppression de colonnes (Feature Selection/Drop Columns)"""
         if columns is None:
             out_df = df.drop(axis=axis, **kwargs)
         else:
             out_df = df.drop(columns=columns, **kwargs)
         
-        # Tenseur identité car même nombre de lignes
         n = len(df)
         identity_tensor = csr_matrix((np.ones(n), (range(n), range(n))), shape=(n, n))
         return out_df, identity_tensor
     
     def decorate_vertical_augmentation(self, df, columns=None, **kwargs):
-        """Vertical Augmentation - ajout de colonnes (One-Hot Encoding)"""
-        if hasattr(pd, 'get_dummies') and self.func.__name__ == 'get_dummies':
-            # Pour pd.get_dummies
-            if columns is None:
-                out_df = pd.get_dummies(df, **kwargs)
-            else:
-                out_df = pd.get_dummies(df, columns=columns, **kwargs)
+        if columns is None:
+            out_df = pd.get_dummies(df, **kwargs)
         else:
-            # Pour d'autres opérations d'augmentation
-            out_df = df.copy()
-            # Ici on pourrait ajouter des colonnes selon les kwargs
-        
-        # Tenseur identité car même nombre de lignes
+                out_df = pd.get_dummies(df, columns=columns, **kwargs)
         n = len(df)
         identity_tensor = csr_matrix((np.ones(n), (range(n), range(n))), shape=(n, n))
         return out_df, identity_tensor
     
     def decorate_horizontal_reduction(self, df, n=None, frac=None, **kwargs):
-        """Horizontal Reduction - réduction du nombre de lignes (sampling, filtering)"""
-        # Correction :
         if self.func.__name__ == 'sample':
             out_df = df.sample(n=n, frac=frac, **kwargs)
         else:
             out_df = df.dropna(**kwargs)
-        
-        # Créer tenseur de mapping pour les indices survivants
         m = len(out_df)
         n_orig = len(df)
-        
-        if hasattr(out_df, 'index'):
-            surviving_indices = out_df.index.tolist()
-        else:
-            surviving_indices = list(range(m))
-        
+        surviving_indices = out_df.index.tolist()
         row_indices = range(m)
         col_indices = surviving_indices
         data = np.ones(m)
@@ -152,29 +129,21 @@ class TProv:
         mapping_tensor = csr_matrix((data, (row_indices, col_indices)), shape=(m, n_orig))
         return out_df, mapping_tensor
     def decorate_transform(self, df, *args, **kwargs):
-        """Data Transformation - modification des valeurs sans changer les lignes"""
-        # Appliquer la transformation
         out_df = self.func(df, *args, **kwargs)
-        
-        # Tenseur identité (même nombre de lignes)
         n = len(df)
         identity_tensor = csr_matrix((np.ones(n), (range(n), range(n))), shape=(n, n))
         return out_df, identity_tensor
 def to_datetime_with_provenance(df, column):
-    """Wrapper pour pd.to_datetime avec provenance"""
     df_copy = df.copy()
     df_copy[column] = pd.to_datetime(df_copy[column])
     n = len(df)
     identity_tensor = csr_matrix((np.ones(n), (range(n), range(n))), shape=(n, n))
     return df_copy, identity_tensor
 def select_columns_with_provenance(df, columns):
-    """Fonction wrapper pour sélection de colonnes avec provenance"""
     if isinstance(columns, str):
-        out_df = df[[columns]]  # Forcer DataFrame même pour une colonne
+        out_df = df[[columns]] 
     else:
         out_df = df[columns]
-    
-    # Tenseur identité (même nombre de lignes)
     n = len(df)
     identity_tensor = csr_matrix((np.ones(n), (range(n), range(n))), shape=(n, n))
     return out_df, identity_tensor
@@ -191,7 +160,6 @@ def compose_all_tensors(*tensors):
         result = tensor @ result
     return result
 
-# Vos fonctions exactement comme elles sont
 def get_sources_for_row(output_row_idx, tensor):
     if output_row_idx >= tensor.shape[0]:
         return []
@@ -220,18 +188,13 @@ def trace_provenance_through_pipeline(final_row_idx, *tensors):
     current_row_idx = final_row_idx
     for i, tensor in enumerate(reversed(tensors)):
         if isinstance(tensor, tuple):
-            # Gestion des opérations merge/join 
             sources = query_merge_provenance(current_row_idx, tensor)
             lineage.append(sources)
-            # Prendre la première source disponible pour continuer
             all_sources = sources['left_dataframe_sources'] + sources['right_dataframe_sources']
             if all_sources:
                 current_row_idx = all_sources[0]
         else:
             sources = get_sources_for_row(current_row_idx, tensor)
             lineage.append(sources)
-            if sources and len(sources) > 0:
-                current_row_idx = sources[0]  # Prendre le premier élément de la liste
-            else:
-                break  # Arrêter si pas de sources
+            current_row_idx = sources[0]  
     return lineage[::-1]
